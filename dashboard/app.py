@@ -27,7 +27,7 @@ MODEL_LABELS = {
     "sma_7": "SMA 7-day",
     "exp_smooth": "Exp Smooth",
 }
-DIRECTION_EMOJI = {"long": "📈", "short": "📉"}
+DIRECTION_LABEL = {"long": "BUY 📈", "short": "SELL 📉"}
 
 st.markdown("""
 <style>
@@ -129,8 +129,9 @@ try:
                 for t in recent_trades:
                     model_label = MODEL_LABELS.get(t["model_id"], t["model_id"])
                     color = MODEL_COLORS.get(t["model_id"], "#fff")
-                    emoji = DIRECTION_EMOJI.get(t["direction"], "")
-                    date_short = t["target_date"][5:]  # MM-DD
+                    direction = DIRECTION_LABEL.get(t["direction"], t["direction"].upper())
+                    dir_color = "#2ecc71" if t["direction"] == "long" else "#e74c3c"
+                    date_short = t["target_date"][5:]
 
                     if t["status"] == "resolved" and t.get("pnl") is not None:
                         pnl = t["pnl"]
@@ -148,8 +149,9 @@ try:
 
                     st.markdown(f"""
                     <div class="trade-card {css_class}">
-                        <div class="trade-model" style="color:{color};">
-                            {model_label} {emoji} {t['direction'].upper()}
+                        <div class="trade-model">
+                            <span style="color:{color};">{model_label}</span>
+                            &nbsp;<span style="color:{dir_color}; font-weight:bold;">{direction}</span>
                         </div>
                         <div>{date_short} &nbsp; <span style="color:{pnl_color}; font-weight:bold;">{pnl_str}</span></div>
                         <div class="trade-reason">{justification}</div>
