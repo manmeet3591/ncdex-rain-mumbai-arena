@@ -6,3 +6,4 @@ venv/
 .env
 daily.log
 .claude/
+.github/workflows/
