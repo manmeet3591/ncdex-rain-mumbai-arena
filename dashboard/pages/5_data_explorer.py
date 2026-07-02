@@ -28,7 +28,7 @@ actuals = [dict(r) for r in rows]
 
 if actuals:
     df = pd.DataFrame(actuals)
-    st.plotly_chart(rainfall_history_chart(actuals), use_container_width=True)
+    st.plotly_chart(rainfall_history_chart(actuals), width="stretch")
 
     col_a, col_b, col_c = st.columns(3)
     values = df["value"].dropna()
@@ -37,7 +37,7 @@ if actuals:
     col_c.metric("Max", f"{values.max():.1f} mm")
 
     st.subheader("Raw Data")
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width="stretch")
 
     csv = df.to_csv(index=False)
     st.download_button("Download CSV", csv, "mumbai_rainfall.csv", "text/csv")

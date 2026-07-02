@@ -18,12 +18,12 @@ conn.close()
 
 if data:
     df = pd.DataFrame(data)
-    st.plotly_chart(leaderboard_bar_chart(data, "mae"), use_container_width=True)
+    st.plotly_chart(leaderboard_bar_chart(data, "mae"), width="stretch")
 
     st.subheader("Rankings")
     display_df = df[["model_id", "name", "n_predictions", "mae", "rmse", "bias"]].copy()
     display_df.index = range(1, len(display_df) + 1)
     display_df.index.name = "Rank"
-    st.dataframe(display_df, use_container_width=True)
+    st.dataframe(display_df, width="stretch")
 else:
     st.info("No scores yet.")

@@ -43,7 +43,7 @@ if scores:
     fig = go.Figure(go.Histogram(x=df["error"], nbinsx=20, marker_color="#3498db"))
     fig.update_layout(template="plotly_dark", height=300,
                       xaxis_title="Error (mm)", yaxis_title="Count")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     st.subheader("Predicted vs Actual Scatter")
     fig2 = go.Figure()
@@ -59,6 +59,6 @@ if scores:
     ))
     fig2.update_layout(template="plotly_dark", height=400,
                        xaxis_title="Actual (mm)", yaxis_title="Predicted (mm)")
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width="stretch")
 else:
     st.info("No scores for this model yet.")

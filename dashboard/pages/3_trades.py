@@ -22,7 +22,7 @@ if trades:
     if resolved:
         total_pnl = sum(t["pnl"] for t in resolved)
         wins = sum(1 for t in resolved if t["pnl"] > 0)
-        st.plotly_chart(pnl_equity_curve(resolved), use_container_width=True)
+        st.plotly_chart(pnl_equity_curve(resolved), width="stretch")
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Trades", len(resolved))
@@ -44,6 +44,6 @@ if trades:
     df = pd.DataFrame(trades)
     display_cols = [c for c in ["model_id", "target_date", "direction",
                                  "position_size", "pnl", "status", "justification"] if c in df.columns]
-    st.dataframe(df[display_cols], use_container_width=True)
+    st.dataframe(df[display_cols], width="stretch")
 else:
     st.info("No trades yet. Models trade selectively — only when they see an edge.")

@@ -30,9 +30,9 @@ scores = compute_model_scores(conn, model_id, "rainfall_mumbai", days)
 conn.close()
 
 if scores:
-    st.plotly_chart(prediction_vs_actual_chart(scores), use_container_width=True)
-    st.plotly_chart(error_over_time_chart(scores), use_container_width=True)
+    st.plotly_chart(prediction_vs_actual_chart(scores), width="stretch")
+    st.plotly_chart(error_over_time_chart(scores), width="stretch")
     st.subheader("Score Details")
-    st.dataframe(pd.DataFrame(scores), use_container_width=True)
+    st.dataframe(pd.DataFrame(scores), width="stretch")
 else:
     st.info("No scored predictions for this selection.")
