@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Initialize database and backfill historical actuals from Open-Meteo."""
+"""Initialize database and backfill historical actuals.
+
+Uses GHCND Santacruz station as primary source (real IMD station data),
+then fills the recent gap with Open-Meteo gridded data.
+"""
 
 import sys
 from pathlib import Path
@@ -10,51 +14,44 @@ import logging
 from datetime import datetime, timedelta
 
 from core.db import init_db, get_connection, store_actual
-from data.open_meteo import fetch_historical_precipitation, fetch_historical_temperature
-from config import MUMBAI_LAT, MUMBAI_LON, POLYMARKET_CITY_COORDS
+from data.ghcnd import fetch_mumbai_rainfall
+from data.open_meteo import fetch_historical_precipitation
+from config import MUMBAI_LAT, MUMBAI_LON
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
 
 def seed_mumbai_rainfall(conn, start_date="2020-01-01"):
-    end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    log.info(f"Fetching Mumbai rainfall {start_date} to {end_date}...")
-    records = fetch_historical_precipitation(MUMBAI_LAT, MUMBAI_LON, start_date, end_date)
-    count = 0
-    for r in records:
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # 1. GHCND Santacruz — real station data (primary)
+    log.info(f"Fetching GHCND Santacruz rainfall {start_date} onwards...")
+    ghcnd_records = fetch_mumbai_rainfall(start_date)
+    ghcnd_count = 0
+    ghcnd_last_date = start_date
+    for r in ghcnd_records:
         if r["value"] is not None:
             store_actual(conn, "rainfall_mumbai", "mumbai", r["date"],
-                         "precipitation_mm", r["value"], "open_meteo")
-            count += 1
-    log.info(f"Inserted {count} Mumbai rainfall records")
-    return count
+                         "precipitation_mm", r["value"], "ghcnd_santacruz")
+            ghcnd_count += 1
+            ghcnd_last_date = r["date"]
+    log.info(f"GHCND Santacruz: {ghcnd_count} records (up to {ghcnd_last_date})")
 
+    # 2. Open-Meteo — fill the gap from GHCND's last date to yesterday
+    gap_start = (datetime.strptime(ghcnd_last_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    if gap_start <= yesterday:
+        log.info(f"Filling gap with Open-Meteo: {gap_start} to {yesterday}...")
+        om_records = fetch_historical_precipitation(MUMBAI_LAT, MUMBAI_LON, gap_start, yesterday)
+        om_count = 0
+        for r in om_records:
+            if r["value"] is not None:
+                store_actual(conn, "rainfall_mumbai", "mumbai", r["date"],
+                             "precipitation_mm", r["value"], "open_meteo")
+                om_count += 1
+        log.info(f"Open-Meteo gap fill: {om_count} records")
 
-def seed_polymarket_temperatures(conn, cities=None, start_date="2024-01-01"):
-    end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-    cities = cities or ["New York City", "Chicago", "Miami", "London", "Tokyo"]
-    total = 0
-    for city in cities:
-        coords = POLYMARKET_CITY_COORDS.get(city)
-        if not coords:
-            log.warning(f"No coords for {city}, skipping")
-            continue
-        log.info(f"Fetching temperature for {city} {start_date} to {end_date}...")
-        try:
-            records = fetch_historical_temperature(coords["lat"], coords["lon"], start_date, end_date)
-            count = 0
-            for r in records:
-                if r["value"] is not None:
-                    store_actual(conn, "temperature_polymarket", city, r["date"],
-                                 "temperature_max_c", r["value"], "open_meteo")
-                    count += 1
-            log.info(f"  {city}: {count} records")
-            total += count
-        except Exception as e:
-            log.error(f"  {city}: failed - {e}")
-    log.info(f"Inserted {total} temperature records total")
-    return total
+    return ghcnd_count
 
 
 def main():
@@ -62,11 +59,16 @@ def main():
     init_db()
     conn = get_connection()
 
-    rainfall_count = seed_mumbai_rainfall(conn)
-    temp_count = seed_polymarket_temperatures(conn)
+    seed_mumbai_rainfall(conn)
 
-    row_count = conn.execute("SELECT COUNT(*) as n FROM actuals").fetchone()["n"]
-    log.info(f"Database seeded. Total actuals: {row_count}")
+    row_count = conn.execute("SELECT COUNT(*) as n FROM actuals WHERE market='rainfall_mumbai'").fetchone()["n"]
+    sources = conn.execute(
+        "SELECT source, COUNT(*) as n, MIN(target_date) as first, MAX(target_date) as last "
+        "FROM actuals WHERE market='rainfall_mumbai' GROUP BY source"
+    ).fetchall()
+    log.info(f"Total Mumbai rainfall records: {row_count}")
+    for s in sources:
+        log.info(f"  {s['source']}: {s['n']} records ({s['first']} to {s['last']})")
     conn.close()
 
 
