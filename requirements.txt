@@ -3,3 +3,4 @@ numpy>=1.26
 pandas>=2.1
 plotly>=5.18
 requests>=2.31
+scipy>=1.11
