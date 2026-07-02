@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from core.db import get_connection, init_db
-from core.paper_trader import get_equity_curves, STARTING_CAPITAL
+from core.paper_trader import get_equity_curves, get_recent_trades, STARTING_CAPITAL
 from core.scorer import compute_leaderboard
 
 st.set_page_config(
@@ -23,16 +23,29 @@ MODEL_COLORS = {
     "exp_smooth": "#2ecc71",
 }
 MODEL_LABELS = {
-    "persistence": "Persistence (Naive)",
+    "persistence": "Persistence",
     "sma_7": "SMA 7-day",
-    "exp_smooth": "Exp Smoothing",
+    "exp_smooth": "Exp Smooth",
 }
+DIRECTION_EMOJI = {"long": "📈", "short": "📉"}
 
 st.markdown("""
 <style>
     .block-container { padding-top: 1rem; }
     h1 { text-align: center; }
-    .stMetric { text-align: center; }
+    .trade-card {
+        border-left: 3px solid;
+        padding: 6px 10px;
+        margin-bottom: 8px;
+        border-radius: 0 6px 6px 0;
+        background: rgba(255,255,255,0.03);
+        font-size: 0.85em;
+    }
+    .trade-win { border-color: #2ecc71; }
+    .trade-loss { border-color: #e74c3c; }
+    .trade-open { border-color: #f39c12; }
+    .trade-model { font-weight: bold; font-size: 0.95em; }
+    .trade-reason { color: #aaa; font-size: 0.82em; margin-top: 2px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -51,61 +64,101 @@ try:
     init_db()
     conn = get_connection()
     equity_data = get_equity_curves(conn, "rainfall_mumbai")
+    recent_trades = get_recent_trades(conn, "rainfall_mumbai", limit=20)
     leaderboard = compute_leaderboard(conn, "rainfall_mumbai", days=30)
     conn.close()
 
     if equity_data:
-        fig = go.Figure()
+        col_chart, col_trades = st.columns([3, 1])
 
-        fig.add_hline(y=STARTING_CAPITAL, line_dash="dash", line_color="rgba(255,255,255,0.3)",
-                      annotation_text=f"Starting Capital ₹{STARTING_CAPITAL:,.0f}",
-                      annotation_position="bottom left",
-                      annotation_font_color="rgba(255,255,255,0.5)")
+        with col_chart:
+            fig = go.Figure()
 
-        sorted_models = sorted(equity_data.items(),
-                                key=lambda x: x[1][-1]["account_value"] if x[1] else 0,
-                                reverse=True)
+            fig.add_hline(y=STARTING_CAPITAL, line_dash="dash", line_color="rgba(255,255,255,0.3)",
+                          annotation_text=f"Starting ₹{STARTING_CAPITAL:,.0f}",
+                          annotation_position="bottom left",
+                          annotation_font_color="rgba(255,255,255,0.5)")
 
-        for model_id, entries in sorted_models:
-            dates = [e["date"] for e in entries]
-            values = [e["account_value"] for e in entries]
-            color = MODEL_COLORS.get(model_id, "#ffffff")
-            label = MODEL_LABELS.get(model_id, model_id)
-            final_val = values[-1] if values else STARTING_CAPITAL
+            sorted_models = sorted(equity_data.items(),
+                                    key=lambda x: x[1][-1]["account_value"] if x[1] else 0,
+                                    reverse=True)
 
-            fig.add_trace(go.Scatter(
-                x=dates, y=values,
-                mode="lines+markers",
-                name=label,
-                line=dict(color=color, width=3),
-                marker=dict(size=4),
-                hovertemplate=f"<b>{label}</b><br>Date: %{{x}}<br>Value: ₹%{{y:,.2f}}<extra></extra>",
-            ))
+            for model_id, entries in sorted_models:
+                dates = [e["date"] for e in entries]
+                values = [e["account_value"] for e in entries]
+                color = MODEL_COLORS.get(model_id, "#ffffff")
+                label = MODEL_LABELS.get(model_id, model_id)
+                final_val = values[-1] if values else STARTING_CAPITAL
 
-            fig.add_annotation(
-                x=dates[-1], y=final_val,
-                text=f"  ₹{final_val:,.0f}",
-                showarrow=False,
-                xanchor="left",
-                font=dict(color=color, size=14, family="monospace"),
+                fig.add_trace(go.Scatter(
+                    x=dates, y=values,
+                    mode="lines+markers",
+                    name=label,
+                    line=dict(color=color, width=3),
+                    marker=dict(size=4),
+                    hovertemplate=f"<b>{label}</b><br>Date: %{{x}}<br>Value: ₹%{{y:,.2f}}<extra></extra>",
+                ))
+
+                fig.add_annotation(
+                    x=dates[-1], y=final_val,
+                    text=f"  ₹{final_val:,.0f}",
+                    showarrow=False,
+                    xanchor="left",
+                    font=dict(color=color, size=14, family="monospace"),
+                )
+
+            fig.update_layout(
+                title=dict(text="TOTAL ACCOUNT VALUE", x=0.5, font=dict(size=20)),
+                template="plotly_dark",
+                height=480,
+                xaxis=dict(title="", gridcolor="rgba(255,255,255,0.1)"),
+                yaxis=dict(title="Account Value (₹)", tickprefix="₹", tickformat=",",
+                           gridcolor="rgba(255,255,255,0.1)"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                            xanchor="center", x=0.5, font=dict(size=13)),
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                margin=dict(r=100),
             )
 
-        fig.update_layout(
-            title=dict(text="TOTAL ACCOUNT VALUE", x=0.5, font=dict(size=20)),
-            template="plotly_dark",
-            height=500,
-            xaxis=dict(title="", gridcolor="rgba(255,255,255,0.1)"),
-            yaxis=dict(title="Account Value (₹)", tickprefix="₹", tickformat=",",
-                       gridcolor="rgba(255,255,255,0.1)"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                        xanchor="center", x=0.5, font=dict(size=13)),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            margin=dict(r=100),
-        )
+            st.plotly_chart(fig, use_container_width=True)
 
-        st.plotly_chart(fig, use_container_width=True)
+        with col_trades:
+            st.markdown("#### Recent Trades")
+            if recent_trades:
+                for t in recent_trades:
+                    model_label = MODEL_LABELS.get(t["model_id"], t["model_id"])
+                    color = MODEL_COLORS.get(t["model_id"], "#fff")
+                    emoji = DIRECTION_EMOJI.get(t["direction"], "")
+                    date_short = t["target_date"][5:]  # MM-DD
 
+                    if t["status"] == "resolved" and t.get("pnl") is not None:
+                        pnl = t["pnl"]
+                        css_class = "trade-win" if pnl >= 0 else "trade-loss"
+                        pnl_str = f"₹{pnl:+.0f}"
+                        pnl_color = "#2ecc71" if pnl >= 0 else "#e74c3c"
+                    else:
+                        css_class = "trade-open"
+                        pnl_str = "pending"
+                        pnl_color = "#f39c12"
+
+                    justification = t.get("justification", "")
+                    if len(justification) > 80:
+                        justification = justification[:77] + "..."
+
+                    st.markdown(f"""
+                    <div class="trade-card {css_class}">
+                        <div class="trade-model" style="color:{color};">
+                            {model_label} {emoji} {t['direction'].upper()}
+                        </div>
+                        <div>{date_short} &nbsp; <span style="color:{pnl_color}; font-weight:bold;">{pnl_str}</span></div>
+                        <div class="trade-reason">{justification}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No trades yet")
+
+        # Standings below the chart
         st.markdown("### Standings")
         cols = st.columns(len(sorted_models))
         for i, (model_id, entries) in enumerate(sorted_models):
@@ -114,10 +167,20 @@ try:
             pct = (pnl / STARTING_CAPITAL) * 100
             label = MODEL_LABELS.get(model_id, model_id)
             color = MODEL_COLORS.get(model_id, "#fff")
+
+            # Count trades for this model
+            model_trades = [t for t in recent_trades if t["model_id"] == model_id and t["status"] == "resolved"]
+            n_trades = len(model_trades)
+            wins = sum(1 for t in model_trades if t.get("pnl", 0) > 0)
+
             with cols[i]:
                 st.markdown(f"<h3 style='color:{color}; text-align:center;'>#{i+1}</h3>",
                             unsafe_allow_html=True)
                 st.metric(label, f"₹{final:,.0f}", delta=f"{pct:+.1f}%")
+                if n_trades > 0:
+                    st.caption(f"{n_trades} trades · {wins}/{n_trades} wins")
+                else:
+                    st.caption("No recent trades")
 
         if leaderboard:
             st.markdown("### Prediction Accuracy (Rainfall mm)")
@@ -136,7 +199,9 @@ try:
 
 except Exception as e:
     st.error(f"Error loading data: {e}")
+    import traceback
+    st.code(traceback.format_exc())
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#555;'>Season 1 — June 2026 | Starting capital: ₹10,000 per model | Data: Open-Meteo</p>",
+st.markdown("<p style='text-align:center; color:#555;'>Season 1 — Monsoon 2026 | Starting capital: ₹10,000 per model | Data: GHCND Santacruz + Open-Meteo</p>",
             unsafe_allow_html=True)

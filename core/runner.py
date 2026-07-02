@@ -39,8 +39,6 @@ def run_arena(target_date: str, markets: list[str] | None = None, db_path: str |
                 log.debug(f"No history for {market_key}/{location}, skipping")
                 continue
 
-            yesterday_value = history[-1]
-
             for model in models:
                 try:
                     prediction = model.predict(history, target_date, variable, location)
@@ -52,10 +50,13 @@ def run_arena(target_date: str, markets: list[str] | None = None, db_path: str |
                     total_predictions += 1
 
                     trade = generate_daily_trade(
-                        model.id, market_key, location, target_date,
-                        prediction.value, yesterday_value,
+                        model.id, market_key, location, target_date, prediction,
                     )
-                    all_trades.append(trade)
+                    if trade is not None:
+                        all_trades.append(trade)
+                    else:
+                        signal = prediction.trade.signal if prediction.trade else "hold"
+                        log.debug(f"{model.id} {signal} on {target_date}")
                 except Exception as e:
                     log.error(f"Model {model.id} failed on {market_key}/{location}: {e}")
 

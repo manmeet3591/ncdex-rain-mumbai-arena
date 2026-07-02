@@ -4,32 +4,33 @@ import logging
 log = logging.getLogger(__name__)
 
 STARTING_CAPITAL = 10_000.0
-BET_SIZE = 200.0
+BASE_BET_SIZE = 200.0
 MAX_DAILY_PNL = 500.0
 
 
 def generate_daily_trade(model_id: str, market: str, location: str,
-                          target_date: str, predicted_value: float,
-                          yesterday_value: float) -> dict:
-    """Every model bets on direction of change vs yesterday.
+                          target_date: str, prediction) -> dict | None:
+    """Generate a trade from a Prediction object. Returns None if model holds."""
+    if prediction.trade is None or prediction.trade.signal == "hold":
+        return None
 
-    Long if prediction > yesterday, short if prediction < yesterday.
-    P&L resolved later against actual change.
-    """
-    direction = "long" if predicted_value >= yesterday_value else "short"
+    signal = prediction.trade.signal
+    confidence = prediction.trade.confidence
+    position_size = BASE_BET_SIZE * max(0.5, min(2.0, confidence * 2))
+
     return {
         "model_id": model_id,
         "market": market,
         "location": location,
         "target_date": target_date,
-        "direction": direction,
-        "entry_price": yesterday_value,
-        "predicted_value": predicted_value,
-        "position_size": BET_SIZE,
+        "direction": signal,
+        "entry_price": prediction.value,
+        "predicted_value": prediction.value,
+        "position_size": round(position_size, 2),
         "shares": 1.0,
         "trade_metadata": json.dumps({
-            "yesterday_value": round(yesterday_value, 2),
-            "predicted_change": round(predicted_value - yesterday_value, 2),
+            "confidence": round(confidence, 3),
+            "justification": prediction.trade.justification,
         }),
     }
 
@@ -55,11 +56,6 @@ def store_trades(conn, trades: list[dict]) -> int:
 
 
 def resolve_trades(conn, market: str | None = None) -> int:
-    """Resolve open trades against actuals.
-
-    P&L = direction_sign × actual_change × bet_multiplier, capped at ±MAX_DAILY_PNL.
-    Bet multiplier scales $BET_SIZE relative to typical daily changes.
-    """
     where = "WHERE t.status = 'open'"
     params = []
     if market:
@@ -86,7 +82,8 @@ def resolve_trades(conn, market: str | None = None) -> int:
         direction_sign = 1.0 if trade["direction"] == "long" else -1.0
 
         scale = 20.0 if "rainfall" in trade["market"] else 5.0
-        pnl = direction_sign * actual_change * (BET_SIZE / scale)
+        pos_size = trade["position_size"] or BASE_BET_SIZE
+        pnl = direction_sign * actual_change * (pos_size / scale)
         pnl = max(-MAX_DAILY_PNL, min(MAX_DAILY_PNL, pnl))
 
         conn.execute(
@@ -103,10 +100,6 @@ def resolve_trades(conn, market: str | None = None) -> int:
 
 
 def get_equity_curves(conn, market: str = "rainfall_mumbai") -> dict[str, list[dict]]:
-    """Compute cumulative account value over time for each model.
-
-    Returns {model_id: [{"date": ..., "account_value": ...}, ...]}.
-    """
     rows = conn.execute("""
         SELECT model_id, target_date, SUM(pnl) as daily_pnl
         FROM trades
@@ -140,3 +133,29 @@ def get_equity_curves(conn, market: str = "rainfall_mumbai") -> dict[str, list[d
             e["account_value"] = round(balance, 2)
 
     return curves
+
+
+def get_recent_trades(conn, market: str = "rainfall_mumbai", limit: int = 15) -> list[dict]:
+    """Get recent trades with justification for the dashboard feed."""
+    rows = conn.execute("""
+        SELECT model_id, target_date, direction, position_size,
+               pnl, status, trade_metadata
+        FROM trades
+        WHERE market = ?
+        ORDER BY target_date DESC, model_id
+        LIMIT ?
+    """, (market, limit)).fetchall()
+
+    trades = []
+    for r in rows:
+        t = dict(r)
+        meta = {}
+        if t.get("trade_metadata"):
+            try:
+                meta = json.loads(t["trade_metadata"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        t["confidence"] = meta.get("confidence", 0)
+        t["justification"] = meta.get("justification", "")
+        trades.append(t)
+    return trades

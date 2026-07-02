@@ -3,12 +3,20 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class TradeDecision:
+    signal: str  # "long", "short", "hold"
+    confidence: float  # 0.0 to 1.0
+    justification: str
+
+
+@dataclass
 class Prediction:
     value: float
     lower: float | None = None
     upper: float | None = None
     confidence: float | None = None
     metadata: dict | None = field(default=None, repr=False)
+    trade: TradeDecision | None = None
 
 
 class BaseModel(ABC):
