@@ -1,0 +1,33 @@
+name: Daily Arena Run
+
+on:
+  schedule:
+    - cron: '30 4 * * *'  # 4:30 UTC = 10:00 AM IST
+  workflow_dispatch:       # manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  run-arena:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily arena
+        run: python scripts/run_daily.py
+
+      - name: Commit updated database
+        run: |
+          git config user.name "Arena Bot"
+          git config user.email "arena-bot@github.com"
+          git add arena.db
+          git diff --cached --quiet || git commit -m "Daily arena run $(date -u +%Y-%m-%d)"
+          git push
