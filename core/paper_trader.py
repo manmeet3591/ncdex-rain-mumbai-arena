@@ -139,7 +139,7 @@ def get_recent_trades(conn, market: str = "rainfall_mumbai", limit: int = 15) ->
     """Get recent trades with justification for the dashboard feed."""
     rows = conn.execute("""
         SELECT model_id, target_date, direction, position_size,
-               pnl, status, trade_metadata
+               entry_price, exit_price, pnl, status, trade_metadata
         FROM trades
         WHERE market = ?
         ORDER BY target_date DESC, model_id

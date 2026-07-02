@@ -27,7 +27,7 @@ MODEL_LABELS = {
     "sma_7": "SMA 7-day",
     "exp_smooth": "Exp Smooth",
 }
-DIRECTION_LABEL = {"long": "BUY 📈", "short": "SELL 📉"}
+DIRECTION_LABEL = {"long": "LONG 📈", "short": "SHORT 📉"}
 
 st.markdown("""
 <style>
@@ -147,6 +147,14 @@ try:
                     if len(justification) > 80:
                         justification = justification[:77] + "..."
 
+                    open_price = t.get("entry_price")
+                    close_price = t.get("exit_price")
+                    oc_str = ""
+                    if open_price is not None:
+                        oc_str = f"Open {open_price:.1f}mm"
+                        if close_price is not None:
+                            oc_str += f" → Close {close_price:.1f}mm"
+
                     st.markdown(f"""
                     <div class="trade-card {css_class}">
                         <div class="trade-model">
@@ -154,6 +162,7 @@ try:
                             &nbsp;<span style="color:{dir_color}; font-weight:bold;">{direction}</span>
                         </div>
                         <div>{date_short} &nbsp; <span style="color:{pnl_color}; font-weight:bold;">{pnl_str}</span></div>
+                        <div style="color:#ccc; font-size:0.82em;">{oc_str}</div>
                         <div class="trade-reason">{justification}</div>
                     </div>
                     """, unsafe_allow_html=True)
