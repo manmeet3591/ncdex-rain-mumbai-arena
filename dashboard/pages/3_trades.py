@@ -25,9 +25,9 @@ if trades:
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Trades", len(resolved))
-        m2.metric("Total P&L", f"${total_pnl:.2f}")
+        m2.metric("Total P&L", f"₹{total_pnl:.2f}")
         m3.metric("Win Rate", f"{wins / len(resolved) * 100:.0f}%")
-        m4.metric("Avg P&L", f"${total_pnl / len(resolved):.2f}")
+        m4.metric("Avg P&L", f"₹{total_pnl / len(resolved):.2f}")
 
     st.subheader("Trade Log")
     df = pd.DataFrame(trades)

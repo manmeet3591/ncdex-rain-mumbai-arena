@@ -58,7 +58,7 @@ try:
         fig = go.Figure()
 
         fig.add_hline(y=STARTING_CAPITAL, line_dash="dash", line_color="rgba(255,255,255,0.3)",
-                      annotation_text=f"Starting Capital ${STARTING_CAPITAL:,.0f}",
+                      annotation_text=f"Starting Capital ₹{STARTING_CAPITAL:,.0f}",
                       annotation_position="bottom left",
                       annotation_font_color="rgba(255,255,255,0.5)")
 
@@ -79,12 +79,12 @@ try:
                 name=label,
                 line=dict(color=color, width=3),
                 marker=dict(size=4),
-                hovertemplate=f"<b>{label}</b><br>Date: %{{x}}<br>Value: $%{{y:,.2f}}<extra></extra>",
+                hovertemplate=f"<b>{label}</b><br>Date: %{{x}}<br>Value: ₹%{{y:,.2f}}<extra></extra>",
             ))
 
             fig.add_annotation(
                 x=dates[-1], y=final_val,
-                text=f"  ${final_val:,.0f}",
+                text=f"  ₹{final_val:,.0f}",
                 showarrow=False,
                 xanchor="left",
                 font=dict(color=color, size=14, family="monospace"),
@@ -95,7 +95,7 @@ try:
             template="plotly_dark",
             height=500,
             xaxis=dict(title="", gridcolor="rgba(255,255,255,0.1)"),
-            yaxis=dict(title="Account Value ($)", tickprefix="$", tickformat=",",
+            yaxis=dict(title="Account Value (₹)", tickprefix="₹", tickformat=",",
                        gridcolor="rgba(255,255,255,0.1)"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02,
                         xanchor="center", x=0.5, font=dict(size=13)),
@@ -117,7 +117,7 @@ try:
             with cols[i]:
                 st.markdown(f"<h3 style='color:{color}; text-align:center;'>#{i+1}</h3>",
                             unsafe_allow_html=True)
-                st.metric(label, f"${final:,.0f}", delta=f"{pct:+.1f}%")
+                st.metric(label, f"₹{final:,.0f}", delta=f"{pct:+.1f}%")
 
         if leaderboard:
             st.markdown("### Prediction Accuracy (Rainfall mm)")
@@ -138,5 +138,5 @@ except Exception as e:
     st.error(f"Error loading data: {e}")
 
 st.markdown("---")
-st.markdown("<p style='text-align:center; color:#555;'>Season 1 — June 2026 | Starting capital: $10,000 per model | Data: Open-Meteo</p>",
+st.markdown("<p style='text-align:center; color:#555;'>Season 1 — June 2026 | Starting capital: ₹10,000 per model | Data: Open-Meteo</p>",
             unsafe_allow_html=True)

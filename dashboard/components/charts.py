@@ -87,7 +87,7 @@ def pnl_equity_curve(trades: list[dict]) -> go.Figure:
     fig.update_layout(
         title="Cumulative P&L",
         xaxis_title="Date",
-        yaxis_title="P&L ($)",
+        yaxis_title="P&L (₹)",
         template="plotly_dark",
         height=350,
     )
